@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BLIND AQUARIUM</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Courier New",monospace;color:#9fe;user-select:none}
+canvas{display:block;width:100%;height:100%}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.85) 100%)}
+#grain{position:fixed;inset:-50%;pointer-events:none;opacity:.07;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");animation:g .4s steps(4) infinite}
+@keyframes g{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(3%,3%)}}
+#hud{position:fixed;left:20px;bottom:18px;right:20px;display:flex;gap:28px;align-items:flex-end;pointer-events:none;text-shadow:0 0 8px #0cf}
+.blk{font-size:12px;letter-spacing:.15em;text-transform:uppercase}
+.bar{width:170px;height:8px;border:1px solid #4ad;margin-top:5px;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:#4df;width:0}
+#noise i{background:#f64}
+#pearls{font-size:22px;letter-spacing:.3em;color:#bff}
+#say{position:fixed;top:14%;width:100%;text-align:center;font-size:18px;letter-spacing:.12em;opacity:0;transition:opacity .6s;text-shadow:0 0 10px #0cf;pointer-events:none}
+#cross{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#8ef;opacity:.5;pointer-events:none}
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(0,4,8,.88);padding:24px;cursor:pointer}
+.ov h1{font-size:clamp(34px,7vw,84px);letter-spacing:.3em;margin:0 0 6px;color:#7ef;text-shadow:0 0 24px #0af,0 0 60px #06a;animation:fl 5s infinite}
+@keyframes fl{0%,92%,96%,100%{opacity:1}94%{opacity:.35}98%{opacity:.7}}
+.ov p{max-width:640px;line-height:1.6;color:#8cd;margin:8px 0}
+.ov b{color:#fff}.ov .go{margin-top:18px;font-size:20px;letter-spacing:.3em;color:#7ef;animation:fl 2.5s infinite}
+.ov small{position:absolute;bottom:10px;color:#468;font-size:11px}
+#dead{background:rgba(60,0,0,.9)}#dead h1{color:#f44;text-shadow:0 0 30px #f00}
+#win h1{color:#fd6;text-shadow:0 0 30px #fa0}
+.hide{display:none!important}
+</style></head><body>
+<canvas id="c"></canvas><div id="vig"></div><div id="grain"></div><div id="cross"></div>
+<div id="say"></div>
+<div id="hud">
+ <div class="blk"><div>Pearls</div><div id="pearls">○○○○○</div></div>
+ <div class="blk" id="pingb"><div>Sonar [Space]</div><div class="bar"><i></i></div></div>
+ <div class="blk" id="noise"><div>Your noise</div><div class="bar"><i></i></div></div>
+ <div class="blk"><div>Shells [F]</div><div id="shells" style="font-size:18px">●●●</div></div>
+</div>
+<div class="ov" id="title">
+ <h1>BLIND AQUARIUM</h1>
+ <p>The Hollow Deep Aquarium was drained forty years ago.<br>The lights are gone. <b>The Listener</b> is not.</p>
+ <p>It has no eyes. It hunts by <b>sound</b>. So do you.</p>
+ <p><b>SPACE / click</b> — sonar ping: lights the world for a moment… and tells the Listener exactly where you are.<br>
+ <b>WASD</b> move · <b>SHIFT</b> run (loud) · <b>C</b> sneak (silent) · <b>F</b> throw a shell as a decoy<br>
+ Follow the humming of the <b>5 glow-pearls</b>, then return to the drain where you started.</p>
+ <div class="go">CLICK TO DESCEND</div>
+ <small>Textures: ambientCG (CC0) · Drone: "Manaos Drones", OpenGameArt (CC0) · Three.js (MIT) · everything else synthesized live</small>
+</div>
+<div class="ov hide" id="pause"><h1 style="font-size:40px">HOLDING BREATH</h1><div class="go">CLICK TO RESUME</div></div>
+<div class="ov hide" id="dead"><h1>IT HEARD YOU</h1><p id="deadmsg"></p><div class="go">CLICK TO TRY AGAIN</div></div>
+<div class="ov hide" id="win"><h1>SURFACED</h1><p>You climbed the drain into the cold night air.<br>Behind you, something is still clicking in the dark.</p><div class="go">CLICK TO DESCEND AGAIN</div></div>
+<script type="importmap">{"imports":{"three":"./lib/three.module.js"}}</script>
+<script type="module" src="main.js"></script>
+</body></html>
