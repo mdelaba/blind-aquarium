@@ -151,7 +151,7 @@ function updateListener() {
 }
 
 // ---------- level ----------
-let grid, levelGroup, pearls, start, exitPos, monster;
+let seen, grid, levelGroup, pearls, start, exitPos, monster;
 const rnd = n => Math.floor(Math.random() * n);
 const solid = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= W || grid[ty][tx] === 1;
 const tileOf = v => Math.floor(v / TILE);
@@ -204,7 +204,7 @@ function buildMonster() {
 function buildLevel() {
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => o.isInstancedMesh && o.dispose()); }
   levelGroup = new THREE.Group(); scene.add(levelGroup);
-  genMaze();
+  genMaze(); seen = Array.from({ length: W }, () => Array(W).fill(0));
   const box = new THREE.BoxGeometry(TILE, WALL_H, TILE), groups = { concrete: [], rust: [], moss: [] };
   for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) if (grid[y][x]) {
     const border = x === 0 || y === 0 || x === W - 1 || y === W - 1;
@@ -269,7 +269,7 @@ function ping() {
   G.pingCd = PING_CD; sfx.ping();
   let slot = G.pings.length < 3 ? G.pings.length : G.pings.indexOf(G.pings.reduce((a, b) => (a.age > b.age ? a : b)));
   G.pings[slot] = { x: cam.position.x, y: cam.position.y, z: cam.position.z, age: 0 };
-  noiseEvent(P.x, P.z, 60, true); G.noiseShow = 1;
+  noiseEvent(P.x, P.z, 60, true); G.noiseShow = 1; reveal(P.x, P.z, 7);
 }
 function throwShell() {
   if (G.shells <= 0 || G.state !== 'play') return;
@@ -277,6 +277,29 @@ function throwShell() {
   const dx = -Math.sin(P.yaw), dz = -Math.cos(P.yaw); let x = P.x, z = P.z;
   for (let d = 0; d < 20; d += .25) { const nx = P.x + dx * d, nz = P.z + dz * d; if (solid(tileOf(nx), tileOf(nz))) break; x = nx; z = nz; }
   setTimeout(() => { sfx.clink({ x, z }); noiseEvent(x, z, 24); }, 350 + Math.hypot(x - P.x, z - P.z) * 25);
+}
+
+// ---------- minimap ----------
+const mini = $('mini'), mctx = mini.getContext('2d'), CELL = mini.width / W;
+function reveal(x, z, steps) {
+  const sx = tileOf(x), sy = tileOf(z), d = new Map([[sy * W + sx, 0]]), q = [[sx, sy]];
+  for (let i = 0; i < q.length; i++) {
+    const [cx, cy] = q[i], k = d.get(cy * W + cx);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = cx + dx, ny = cy + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < W) seen[ny][nx] = 1; }
+    if (k >= steps) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, id = ny * W + nx; if (!solid(nx, ny) && !d.has(id)) { d.set(id, k + 1); q.push([nx, ny]); } }
+  }
+}
+function drawMinimap(t) {
+  mctx.clearRect(0, 0, mini.width, mini.height);
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) if (seen[y][x]) { mctx.fillStyle = grid[y][x] ? '#1a5a78' : '#0a2433'; mctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+  const px = P.x / TILE * CELL, pz = P.z / TILE * CELL;
+  const allGot = pearls.every(p => p.got);
+  if (allGot && seen[tileOf(exitPos.z)][tileOf(exitPos.x)]) { mctx.fillStyle = '#fc4'; mctx.fillRect(exitPos.x / TILE * CELL - 2, exitPos.z / TILE * CELL - 2, 4, 4); }
+  mctx.fillStyle = '#bff';
+  for (const p of pearls) if (!p.got && seen[tileOf(p.pos.z)][tileOf(p.pos.x)]) { mctx.beginPath(); mctx.arc(p.pos.x / TILE * CELL, p.pos.z / TILE * CELL, 2.5, 0, 7); mctx.fill(); }
+  mctx.save(); mctx.translate(px, pz); mctx.rotate(-P.yaw); mctx.fillStyle = '#fff';
+  mctx.beginPath(); mctx.moveTo(0, -5); mctx.lineTo(3.5, 4); mctx.lineTo(-3.5, 4); mctx.closePath(); mctx.fill(); mctx.restore();
 }
 
 // ---------- input ----------
@@ -320,6 +343,7 @@ function updatePlayer(dt) {
   // footstep noise is continuous: the Listener tracks whatever it can hear
   if (G.noiseR > 0) noiseEvent(P.x, P.z, G.noiseR);
   G.noiseShow = Math.max(G.noiseShow - dt * .6, G.noiseR / 11);
+  reveal(P.x, P.z, 1);
   cam.position.set(P.x, 1.65 - P.crouch * .7 + Math.sin(P.bob) * .025 * (sp > .3 ? 1 : 0), P.z);
   cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
 }
@@ -414,7 +438,7 @@ function frame() {
     T += dt; shared.uTime.value = T;
     if (G.state === 'play') {
       updatePlayer(dt); G.pingCd = Math.max(0, G.pingCd - dt);
-      const dist = updateMonster(dt, T); updatePearls(dt, T);
+      const dist = updateMonster(dt, T); updatePearls(dt, T); drawMinimap(T);
       $('noise').firstElementChild.nextElementSibling.firstElementChild.style.width = Math.min(100, G.noiseShow * 100) + '%';
       $('pingb').firstElementChild.nextElementSibling.firstElementChild.style.width = (1 - G.pingCd / PING_CD) * 100 + '%';
       if (G.msgT > 0 && (G.msgT -= dt) <= 0) $('say').style.opacity = 0;
