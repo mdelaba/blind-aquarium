@@ -240,7 +240,7 @@ function buildLevel() {
 
 // ---------- player / state ----------
 const P = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, bob: 0, stride: 0, vx: 0, vz: 0 };
-const G = { state: 'menu', pings: [], pingCd: 0, shells: 3, noiseR: 0, noiseShow: 0, hb: 0, dead: 0, msgT: 0, lastNoise: 0 };
+const G = { state: 'menu', pings: [], pingCd: 0, shells: 3, noiseR: 0, noiseShow: 0, hb: 0, dead: 0, msgT: 0, lastNoise: 0, mapT: 0, mapX: 0, mapZ: 0 };
 const keys = {};
 const cam = camera;
 
@@ -249,7 +249,7 @@ function resetGame() {
   P.x = start.x; P.z = start.z; P.yaw = Math.PI / 2 * (Math.random() < .5 ? 0 : 1); P.pitch = 0; P.crouch = 0;
   // face an open direction
   for (const [yaw, dx, dy] of [[Math.PI, 0, 1], [-Math.PI / 2, 1, 0]]) if (!solid(1 + dx, 1 + dy)) { P.yaw = yaw; break; }
-  monster.mesh.scale.setScalar(1); G.pings = []; G.pingCd = 0; G.shells = 3; G.dead = 0; G.hb = 0; G.scareStart = 0;
+  monster.mesh.scale.setScalar(1); G.pings = []; G.mapT = 0; G.pingCd = 0; G.shells = 3; G.dead = 0; G.hb = 0; G.scareStart = 0;
   for (let i = 0; i < 3; i++) shared.uPings.value[i].w = -1;
   updateHud(); G.state = 'play';
   say('Something clicks in the dark…  Ping to see. Be quiet to live.', 5);
@@ -269,7 +269,7 @@ function ping() {
   G.pingCd = PING_CD; sfx.ping();
   let slot = G.pings.length < 3 ? G.pings.length : G.pings.indexOf(G.pings.reduce((a, b) => (a.age > b.age ? a : b)));
   G.pings[slot] = { x: cam.position.x, y: cam.position.y, z: cam.position.z, age: 0 };
-  noiseEvent(P.x, P.z, 60, true); G.noiseShow = 1; reveal(P.x, P.z, 7);
+  noiseEvent(P.x, P.z, 60, true); G.noiseShow = 1; G.mapT = MAP_TIME; G.mapX = P.x; G.mapZ = P.z;
 }
 function throwShell() {
   if (G.shells <= 0 || G.state !== 'play') return;
@@ -281,23 +281,21 @@ function throwShell() {
 
 // ---------- minimap ----------
 const mini = $('mini'), mctx = mini.getContext('2d'), CELL = mini.width / W;
-function reveal(x, z, steps) {
-  const sx = tileOf(x), sy = tileOf(z), d = new Map([[sy * W + sx, 0]]), q = [[sx, sy]];
-  for (let i = 0; i < q.length; i++) {
-    const [cx, cy] = q[i], k = d.get(cy * W + cx);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = cx + dx, ny = cy + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < W) seen[ny][nx] = 1; }
-    if (k >= steps) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, id = ny * W + nx; if (!solid(nx, ny) && !d.has(id)) { d.set(id, k + 1); q.push([nx, ny]); } }
-  }
-}
+const MAP_TIME = 5, MAP_R = 7;
 function drawMinimap(t) {
   mctx.clearRect(0, 0, mini.width, mini.height);
-  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) if (seen[y][x]) { mctx.fillStyle = grid[y][x] ? '#1a5a78' : '#0a2433'; mctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
   const px = P.x / TILE * CELL, pz = P.z / TILE * CELL;
-  const allGot = pearls.every(p => p.got);
-  if (allGot && seen[tileOf(exitPos.z)][tileOf(exitPos.x)]) { mctx.fillStyle = '#fc4'; mctx.fillRect(exitPos.x / TILE * CELL - 2, exitPos.z / TILE * CELL - 2, 4, 4); }
-  mctx.fillStyle = '#bff';
-  for (const p of pearls) if (!p.got && seen[tileOf(p.pos.z)][tileOf(p.pos.x)]) { mctx.beginPath(); mctx.arc(p.pos.x / TILE * CELL, p.pos.z / TILE * CELL, 2.5, 0, 7); mctx.fill(); }
+  if (G.mapT > 0) {
+    const cx = G.mapX / TILE * CELL, cz = G.mapZ / TILE * CELL, r = MAP_R * CELL;
+    mctx.save(); mctx.globalAlpha = Math.min(1, G.mapT);
+    mctx.beginPath(); mctx.arc(cx, cz, r, 0, 7); mctx.clip();
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) { mctx.fillStyle = grid[y][x] ? '#1a5a78' : '#0a2433'; mctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+    if (pearls.every(p => p.got)) { mctx.fillStyle = '#fc4'; mctx.fillRect(exitPos.x / TILE * CELL - 2, exitPos.z / TILE * CELL - 2, 4, 4); }
+    mctx.fillStyle = '#bff';
+    for (const p of pearls) if (!p.got) { mctx.beginPath(); mctx.arc(p.pos.x / TILE * CELL, p.pos.z / TILE * CELL, 2.5, 0, 7); mctx.fill(); }
+    mctx.restore();
+    mctx.save(); mctx.globalAlpha = Math.min(1, G.mapT) * .6; mctx.strokeStyle = '#5ac'; mctx.beginPath(); mctx.arc(cx, cz, r, 0, 7); mctx.stroke(); mctx.restore();
+  }
   mctx.save(); mctx.translate(px, pz); mctx.rotate(-P.yaw); mctx.fillStyle = '#fff';
   mctx.beginPath(); mctx.moveTo(0, -5); mctx.lineTo(3.5, 4); mctx.lineTo(-3.5, 4); mctx.closePath(); mctx.fill(); mctx.restore();
 }
@@ -343,7 +341,6 @@ function updatePlayer(dt) {
   // footstep noise is continuous: the Listener tracks whatever it can hear
   if (G.noiseR > 0) noiseEvent(P.x, P.z, G.noiseR);
   G.noiseShow = Math.max(G.noiseShow - dt * .6, G.noiseR / 11);
-  reveal(P.x, P.z, 1);
   cam.position.set(P.x, 1.65 - P.crouch * .7 + Math.sin(P.bob) * .025 * (sp > .3 ? 1 : 0), P.z);
   cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
 }
@@ -438,7 +435,7 @@ function frame() {
     T += dt; shared.uTime.value = T;
     if (G.state === 'play') {
       updatePlayer(dt); G.pingCd = Math.max(0, G.pingCd - dt);
-      const dist = updateMonster(dt, T); updatePearls(dt, T); drawMinimap(T);
+      const dist = updateMonster(dt, T); updatePearls(dt, T); G.mapT = Math.max(0, G.mapT - dt); drawMinimap(T);
       $('noise').firstElementChild.nextElementSibling.firstElementChild.style.width = Math.min(100, G.noiseShow * 100) + '%';
       $('pingb').firstElementChild.nextElementSibling.firstElementChild.style.width = (1 - G.pingCd / PING_CD) * 100 + '%';
       if (G.msgT > 0 && (G.msgT -= dt) <= 0) $('say').style.opacity = 0;
